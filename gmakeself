@@ -1,0 +1,126 @@
+#!/bin/bash
+
+# gMakeself 0.1
+# Copyright © 2010 Daniel J Griffiths <ghost1227@archlinux.us>
+#
+# gMakeself is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License as
+# published by the Free Software Foundation; either version 2
+# of the License, or (at your option) any later version.
+#
+# gMakeself is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU 
+# General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with gMakeself; if not, write to the Free Software Foundation, 
+# Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301 USA
+
+ver="0.1"
+title="gMakeself ${ver}"
+config="${XDG_CONFIG_HOME}/gMakeself.conf"
+icon="--window-icon=gmakeself.png"
+
+menu() {
+    # Display main menu
+    menuopt=$(zenity --list --title="${title}"  ${icon} --text "Main Menu" --radiolist --column "Enable" --column "Option" TRUE "Make new script" FALSE "Make config file" FALSE "Display man page" FALSE "About gMakeself");
+    [[ "${?}" == "1" ]] && exit 0
+    [[ "${menuopt}" == "Make new script" ]] && make
+    [[ "${menuopt}" == "Make config file" ]] && makeconfig
+    [[ "${menuopt}" == "Display man page" ]] && showman
+    [[ "${menuopt}" == "About gMakeself" ]] && about
+}
+
+make() {
+    # Check for default option
+    if [[ -z ${compress} ]]; then
+        # Compression options
+        compress=$(zenity --list --title="${title}" ${icon} --text "Compression" --radiolist --column "Enable" --column "Option" TRUE "Compress using gzip" FALSE "Compress using bzip2" FALSE "Compress using compress");
+        [[ "${?}" == "1" ]] && terminated
+        [[ "${compress}" == "Compress using gzip" ]] && opts="--gzip"
+        [[ "${compress}" == "Compress using bzip2" ]] && opts="--bzip2"
+        [[ "${compress}" == "Compress using compress" ]] && opts="--compress"
+    fi
+
+    # Additional options
+    add=$(zenity --entry --title="${title}" ${icon} --entry-text="${add}" --text "Other command line options (see 'man makeself' for details)");
+    [[ "${?}" == "1" ]] && terminated
+    [[ ! -z ${add} ]] && opts="${opts} ${add}"
+
+    # Set archive dir
+    zenity --info --title="${title}" ${icon} --text "You must now select the source\ndirectory for your archive" --timeout=3
+    archive=$(zenity --file-selection --directory --title="${title}" ${icon});
+    [[ "${?}" == "1" ]] && terminated
+
+    # Set output file
+    zenity --info --title="${title}" ${icon} --text "You must now specify\nthe output file name" --timeout=3
+    savefile=$(zenity --file-selection --save --confirm-overwrite --title="${title}" ${icon});
+    [[ "${?}" == "1" ]] && terminated
+
+    # Set file label
+    while [[ "${label}" == "" ]]; do
+        setlabel
+    done
+
+    # Set startup script
+    startup=$(zenity --entry --title="${title}" ${icon} --text "Specify what to run on extraction\n(prefix with ./ if inside archive)");
+    [[ "${?}" == "1" ]] && terminated
+
+    opts="${opts} ${archive} ${savefile} \"${label}\" ${startup}"
+
+    # Ugly hack... without the tmp file, the script breaks 
+    # if there are spaces in the label
+    echo -e "#/bin/bash\nmakeself ${opts}" >> /tmp/gmakeself.out
+    sh /tmp/gmakeself.out | zenity --text-info --title="${title}" ${icon} --width=350 --height=250
+    rm -f /tmp/gmakeself.out
+
+    exit 0
+}
+
+makeconfig() {
+    # Remove existing config
+    if [[ -f ${config} ]]; then
+        replace=$(zenity --question --title="${title}" ${icon} --text "A gMakeself config file already exists!\nAre you sure you want to replace it?");
+        [[ "${?}" == "1" ]] && menu
+        rm -f ${config}
+    fi
+
+    echo -e "# Config file for gMakeself\n" >> ${config}
+    # Set default compression option
+    setcompress=$(zenity --list --title="${title}" ${icon} --text "Compression" --radiolist --column "Enable" --column "Option" TRUE "Compress using gzip" FALSE "Compress using bzip2" FALSE "Compress using compress");
+    [[ "${?}" == "1" ]] && menu
+    echo -e "# Compression method" >> ${config}
+    [[ "${setcompress}" == "Compress using gzip" ]] && echo -e "opts=\"--gzip\"" >> ${config}
+    [[ "${setcompress}" == "Compress using bzip2" ]] && echo -e "opts=\"--bzip2\"" >> ${config}
+    [[ "${setcompress}" == "Compress using compress" ]] && echo -e "opts=\"--compress\"" >> ${config}
+
+    # Set additional default options
+    setadd=$(zenity --entry --title="${title}" ${icon} --text "Other command line options (see 'man makeself' for details)");
+    [[ "${?}" == "1" ]] && menu
+    [[ ! -z ${setadd} ]] && echo -e "\n# Additional command line opts\nadd=\"${setadd}\"" >> ${config}
+
+    menu
+}
+
+setlabel() {
+    label=$(zenity --entry --title="${title}" ${icon} --text "Specify the name of this executable");
+    [[ "${?}" == "1" ]] && terminated
+}
+
+showman() {
+    man makeself | zenity --title="${title}" ${icon} --text-info --width 600 --height 600
+    menu
+}
+
+about() {
+    zenity --info --title="${title}" ${icon} --text "gMakeself ${ver}\n\nA simple zenity-based frontend for makeself\n\nCopyright © 2010 Daniel J Griffiths\nLicensed under the GNU General Public License"
+    menu
+}
+
+terminated() {
+    zenity --error --title="${title}" ${icon} --text "Terminated by user"
+    exit 0
+}
+
+menu
