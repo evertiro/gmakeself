@@ -34,7 +34,9 @@ menu() {
 
 make() {
     # Check for default option
-    if [[ -z ${compress} ]]; then
+    [[ -f ${config} ]] && . ${config}
+
+    if [[ -z ${opts} ]]; then
         # Compression options
         compress=$(zenity --list --title="${title}" ${icon} --text "Compression" --radiolist --column "Enable" --column "Option" TRUE "Compress using gzip" FALSE "Compress using bzip2" FALSE "Compress using compress");
         [[ "${?}" == "1" ]] && terminated
@@ -75,6 +77,9 @@ make() {
     sh /tmp/gmakeself.out | zenity --text-info --title="${title}" ${icon} --width=350 --height=250
     rm -f /tmp/gmakeself.out
 
+    # Set output file executable
+    chmod +x ${savefile}
+    
     exit 0
 }
 
